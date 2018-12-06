@@ -1,0 +1,6 @@
+{
+  "levelsByImplementingClass": {
+    "io.infinite.speedometer.Speedometer": "EXPRESSION"
+  },
+  "defaultLevel": "EXPRESSION"
+}
