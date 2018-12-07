@@ -4,18 +4,13 @@ import groovy.util.logging.Slf4j
 import io.infinite.speedometer.others.*
 import io.infinite.speedometer.others.superconstructor.Bar
 import io.infinite.speedometer.others.supermethod.SubClass
-import io.infinite.speedometer.tests.*
 import org.junit.Test
 
 @Slf4j
-class AllTests implements Runnable{
+class AllTests {
 
-    public static void main1(String[] args) {
-        new AllTests().run()
-    }
-
+    @Test
     void run() {
-
         new ItVariable().test()
         new Bar()
         new ThreadSafety().start()
@@ -32,6 +27,7 @@ class AllTests implements Runnable{
         new ErrorStrategies().test()
         new ClassAnnotation().someMethod()
         new Static().test()
+        println("finished")
     }
 
 

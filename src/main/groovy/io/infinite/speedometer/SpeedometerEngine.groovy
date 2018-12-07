@@ -1,77 +1,66 @@
 package io.infinite.speedometer
 
+import groovy.sql.Sql
 import io.infinite.carburetor.CarburetorEngine
 import io.infinite.carburetor.ast.MetaDataASTNode
 import io.infinite.carburetor.ast.MetaDataExpression
 import io.infinite.carburetor.ast.MetaDataMethodNode
 import io.infinite.carburetor.ast.MetaDataStatement
-import io.infinite.speedometer.ast.ExecutionASTNode
-import io.infinite.speedometer.stat.Stat
 
 class SpeedometerEngine extends CarburetorEngine {
 
     ExecutionASTNode executionASTNode
 
-    Map<String, Stat> cumulativeStatMap = [:]
-    Map<String, Stat> standaloneStatMap = [:]
+    ExecutionASTNode executionMethodASTNode
 
-    static Object statWritingLock = new Object()
+    List<ExecutionASTNode> executionASTNodes = []
 
-    static ThreadLocal engineThreadLocal = new ThreadLocal()
+    static Object printLock = new Object()
 
-    static void printStats(Map<String, Stat> statMap) {
-        for (key in statMap.keySet()) {
-            System.out.println(key + statMap.get(key).count + ";" + statMap.get(key).duration)
-        }
+    static Sql sql = Sql.newInstance("jdbc:h2:mem:SPEEDOMETER;DB_CLOSE_ON_EXIT=FALSE", "sa", "", "org.h2.Driver")
+
+    static getInstance() {
+        return SpeedometerFactory.getInstance()
     }
 
-    static CarburetorEngine getInstance() {
-        SpeedometerEngine speedometerEngine = engineThreadLocal.get() as SpeedometerEngine
-        if (speedometerEngine == null) {
-            speedometerEngine = new SpeedometerEngine()
-            engineThreadLocal.set(speedometerEngine)
+    static {
+        sql.getConnection().setAutoCommit(false)
+        sql.execute("""create table EXECUTIONASTNODES (threadName varchar(128), standaloneKeyHash varchar(16), cumulativeKey varchar(4000), elapsedTime integer, standaloneKey varchar(4000))""")
+    }
+
+    void saveStats() {
+        executionASTNodes.each {
+            sql.execute("insert into EXECUTIONASTNODES values (?, ?, ?, ?, ?)", [Thread.currentThread().getName(), it.standaloneKeyHash, it.cumulativeKey, it.getElapsedTime(), it.standaloneKey])
         }
-        return speedometerEngine
+        sql.commit()
     }
 
     void printStats() {
-        System.out.println("Stats for thread " + Thread.currentThread().getName() + ":")
-        System.out.println("Cumulative stats:")
-        printStats(cumulativeStatMap)
-        System.out.println("Standalone stats:")
-        printStats(standaloneStatMap)
+        println("Stats for thread: " + Thread.currentThread().getName())
+        sql.eachRow("select count(*) cc, sum(elapsedTime) t, standaloneKeyHash, cumulativeKey, standaloneKey from EXECUTIONASTNODES where threadName='${Thread.currentThread().getName()}' group by standaloneKeyHash, cumulativeKey, standaloneKey order by 2 desc limit 10") {
+            println(it)
+        }
     }
 
-    @Override
-    Closure getShutdownHook() {
-        return {
-            synchronized (statWritingLock) {
+    SpeedometerEngine() {
+        addShutdownHook {
+            while (executionASTNode != null) {
+                executionClose()
+            }
+            saveStats()
+            synchronized (printLock) {
                 printStats()
             }
         }
     }
 
-    static void updateStatsCount(Map<String, Stat> statMap, String key) {
-        if (statMap.containsKey(key)) {
-            statMap.get(key).count = statMap.get(key).count + 1
-        } else {
-            statMap.put(key, new Stat())
-        }
-    }
-
-    static void updateStatsTime(Map<String, Stat> statMap, String key, Long elapsedTime) {
-        if (statMap.containsKey(key)) {
-            statMap.get(key).duration = elapsedTime
-        } else {
-            statMap.put(key, new Stat())
-        }
-    }
-
     void addExecutionASTNode(MetaDataASTNode metaDataASTNode) {
-        ExecutionASTNode newExecutionASTNode = new ExecutionASTNode(this.executionASTNode, metaDataASTNode)
+        if (metaDataASTNode instanceof MetaDataMethodNode) {
+            executionMethodASTNode = new ExecutionASTNode(this.executionASTNode, metaDataASTNode, executionMethodASTNode)
+        }
+        ExecutionASTNode newExecutionASTNode = new ExecutionASTNode(this.executionASTNode, metaDataASTNode, executionMethodASTNode)
         executionASTNode = newExecutionASTNode
-        updateStatsCount(cumulativeStatMap, newExecutionASTNode.getCumulativeKey())
-        updateStatsCount(standaloneStatMap, newExecutionASTNode.getStandaloneKey())
+        executionASTNodes.add(executionASTNode)
     }
 
     @Override
@@ -97,9 +86,10 @@ class SpeedometerEngine extends CarburetorEngine {
     @Override
     void executionClose() {
         executionASTNode.stopTiming()
-        updateStatsTime(cumulativeStatMap, executionASTNode.getCumulativeKey(), executionASTNode.getElapsedTime())
-        updateStatsTime(standaloneStatMap, executionASTNode.getStandaloneKey(), executionASTNode.getElapsedTime())
         executionASTNode = executionASTNode.getParentExecutionASTNode()
+        if (executionASTNode?.metaDataASTNode instanceof MetaDataMethodNode) {
+            executionMethodASTNode = executionASTNode
+        }
     }
 
     @Override
