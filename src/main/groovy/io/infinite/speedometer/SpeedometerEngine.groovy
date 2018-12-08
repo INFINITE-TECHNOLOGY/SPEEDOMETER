@@ -25,19 +25,19 @@ class SpeedometerEngine extends CarburetorEngine {
 
     static {
         sql.getConnection().setAutoCommit(false)
-        sql.execute("""create table EXECUTIONASTNODES (threadName varchar(128), standaloneKeyHash varchar(16), cumulativeKey varchar(4000), elapsedTime integer, standaloneKey varchar(4000))""")
+        sql.execute("""create table EXECUTIONASTNODES (threadName varchar(128), stackKey longtext, elapsedTime integer, codeKey varchar(4000))""")
     }
 
     void saveStats() {
         executionASTNodes.each {
-            sql.execute("insert into EXECUTIONASTNODES values (?, ?, ?, ?, ?)", [Thread.currentThread().getName(), it.standaloneKeyHash, it.cumulativeKey, it.getElapsedTime(), it.standaloneKey])
+            sql.execute("insert into EXECUTIONASTNODES values (?, ?, ?, ?)", [Thread.currentThread().getName(), it.stackKey, it.getElapsedTime(), it.codeKey])
         }
         sql.commit()
     }
 
     void printStats() {
         println("Stats for thread: " + Thread.currentThread().getName())
-        sql.eachRow("select count(*) cc, sum(elapsedTime) t, standaloneKeyHash, cumulativeKey, standaloneKey from EXECUTIONASTNODES where threadName='${Thread.currentThread().getName()}' group by standaloneKeyHash, cumulativeKey, standaloneKey order by 2 desc limit 10") {
+        sql.eachRow("select count(*) cc, sum(elapsedTime) t, stackKey, codeKey from EXECUTIONASTNODES where threadName='${Thread.currentThread().getName()}' group by stackKey, codeKey order by 2 desc limit 50") {
             println(it)
         }
     }

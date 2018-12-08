@@ -25,9 +25,10 @@ class AllTests {
         assert toString.toString() == "io.infinite.speedometer.others.ToString@" + Integer.toHexString(toString.hashCode())
         new DelegateTest().test()
         new ErrorStrategies().test()
-        new ClassAnnotation().someMethod()
+        //new ClassAnnotation().someMethod()
         new Static().test()
-        println("finished")
+        new Elvis().test()
+        new OuterClassTest().test()
     }
 
 

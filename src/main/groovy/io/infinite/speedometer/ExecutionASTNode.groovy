@@ -17,11 +17,9 @@ class ExecutionASTNode {
 
     Long endTimeMillis
 
-    String cumulativeKey
+    String stackKey
 
-    String standaloneKey
-
-    String standaloneKeyHash
+    String codeKey
 
     void stopTiming() {
         if (endTimeMillis == null) {
@@ -37,16 +35,16 @@ class ExecutionASTNode {
         return endTimeMillis - startTimeMillis
     }
 
-    String computeStandaloneKey() {
+    String computeCodeKey() {
         switch (metaDataASTNode) {
             case MetaDataMethodNode:
-                return metaDataASTNode.className + "." + metaDataASTNode.methodName + "(...):" + metaDataASTNode.lineNumber + ":" + metaDataASTNode.columnNumber
+                return metaDataASTNode.classSimpleName + "." + metaDataASTNode.methodName + "(...):" + metaDataASTNode.lineNumber + ":" + metaDataASTNode.columnNumber
                 break
             case MetaDataExpression:
-                return parentMethodASTNode.metaDataASTNode.className + "." + parentMethodASTNode.metaDataASTNode.methodName + "(...):" + metaDataASTNode.expressionClassName + ":" + metaDataASTNode.lineNumber + ":" + metaDataASTNode.columnNumber
+                return parentMethodASTNode.metaDataASTNode.classSimpleName + "." + parentMethodASTNode.metaDataASTNode.methodName + "(...):" + metaDataASTNode.expressionClassName + ":" + metaDataASTNode.lineNumber + ":" + metaDataASTNode.columnNumber
                 break
             case MetaDataStatement:
-                return parentMethodASTNode.metaDataASTNode.className + "." + parentMethodASTNode.metaDataASTNode.methodName + "(...):" + metaDataASTNode.statementClassName + ":" + metaDataASTNode.lineNumber + ":" + metaDataASTNode.columnNumber
+                return parentMethodASTNode.metaDataASTNode.classSimpleName + "." + parentMethodASTNode.metaDataASTNode.methodName + "(...):" + metaDataASTNode.statementClassName + ":" + metaDataASTNode.lineNumber + ":" + metaDataASTNode.columnNumber
                 break
             default:
                 return ""
@@ -57,8 +55,7 @@ class ExecutionASTNode {
         this.parentMethodASTNode = parentMethodASTNode
         this.parentExecutionASTNode = parentExecutionASTNode
         this.metaDataASTNode = metaDataASTNode
-        this.standaloneKey = computeStandaloneKey()
-        this.standaloneKeyHash = this.standaloneKey.hashCode()
-        this.cumulativeKey = (this.parentExecutionASTNode?.cumulativeKey ?: "") + "->" + this.standaloneKeyHash
+        this.codeKey = computeCodeKey()
+        this.stackKey = (this.parentExecutionASTNode?.stackKey ?: "") + "->" + this.codeKey.hashCode().toString()
     }
 }
